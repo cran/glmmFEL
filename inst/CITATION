@@ -1,0 +1,21 @@
+## R package reference generated from DESCRIPTION metadata
+citation(auto = meta)
+
+## Method reference
+bibentry(
+  bibtype = "Article",
+  title = paste(
+    "Computation of maximum likelihood estimates for multiresponse",
+    "generalized linear mixed models with non-nested, correlated random effects"
+  ),
+  author = c(
+    person(given = c("Andrew", "T."), family = "Karl"),
+    person(given = "Y", family = "Yang"),
+    person(given = c("Sharon", "L."), family = "Lohr")
+  ),
+  journal = "Computational Statistics & Data Analysis",
+  year = "2014",
+  volume = "73",
+  pages = "146--162",
+  doi = "10.1016/j.csda.2013.11.019"
+)
