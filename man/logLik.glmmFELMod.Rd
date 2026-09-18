@@ -13,7 +13,7 @@
 }
 \value{
 An object of class \code{"logLik"} giving the approximate log-likelihood
-stored in \code{object$logLik}, with attributes \code{"df"} (effective number of
+stored in \code{object$logLik} (NA for PL fits), with attributes \code{"df"} (effective number of
 parameters, taken as \code{length(beta) + 1} for the variance component) and
 \code{"nobs"} (number of observations).
 }

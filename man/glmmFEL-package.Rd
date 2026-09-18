@@ -9,12 +9,12 @@
 normal random effects using a matrix-based interface where users supply
 \eqn{(y, X, Z)} directly. Model fitting is performed with an EM algorithm whose
 E-step can be approximated using first-order Laplace or fully exponential Laplace
-(mean-only or mean + covariance corrections), and includes pseudo-likelihood
+(mean-only or mean and variance-diagonal corrections), and includes pseudo-likelihood
 alternatives based on working-response / working-weights linearization.
 
-This development branch is intentionally \strong{matrix-first} and supports a flexible
-(including multiple-membership) random-effects design matrix \eqn{Z}; see the
-package NOTE for details on current covariance support and planned extensions.
+The matrix interface supports multiple-membership designs with a single
+variance component. It does not implement all covariance structures in the
+cited papers. See \code{\link[=glmmFEL]{glmmFEL()}} for the precise approximation and output limits.
 
 Supported families in this branch:
 \itemize{
@@ -23,55 +23,14 @@ Supported families in this branch:
 \item \code{family = stats::poisson(link = "log")} (Poisson log-link).
 }
 }
-\section{NOTE}{
-
-This matrix-only development branch is a streamlined rewrite based on the
-binary/Poisson engines in \pkg{mvglmmRank} (which were based on Karl, Yang,
-and Lohr, 2014). The fully exponential Laplace EM strategy is described in
-Karl, Yang, and Lohr (2014) and related fully exponential Laplace work such
-as Tierney, Kass, and Kadane (1989) and Rizopoulos, Verbeke, and Lesaffre (2009);
-the FE-within-EM lineage is attributed to Steele (1996). Karl, Yang, and Lohr (2014)
-referenced the source code of package JM when writing their own code.
-
-At present, the package supports a single random-effect vector (i.e., one variance
-component). However, the theory in the references above—and the joint Poisson-binary
-model already implemented in \pkg{mvglmmRank}—extends naturally to a block-diagonal
-random-effects covariance matrix \eqn{G}. This would allow multiple independent random
-effects and/or random intercept–slope specifications, with intercepts and slopes either
-correlated or uncorrelated (depending on the block structure). Enabling this functionality
-primarily involves allowing the user to specify a \eqn{G} structure in the main fitting
-function. The maintainer has working prototype code for selected \eqn{G} structures, but it
-has not yet been tested sufficiently for release; future support may be added. If you would
-like a particular \eqn{G} structure supported, please email the package maintainer with a
-request.
-
-Importantly, the current implementation already supports a multiple-membership (or otherwise
-arbitrary) random-effects design matrix \eqn{Z}, which is more general than what is available
-in some other implementations. In particular, the multi-membership setting allows more than
-one random effect from the same variance component to be active on the same observation, possibly
-with different weight entries per random effect; see Karl, Yang, and Lohr (2014) for details.
-
-The \code{RSPL}/\code{MSPL} pseudo-likelihood code paths are adapted from the
-RealVAMS implementation described in Broatch, Green, and Karl (2018), which
-follows Wolfinger and O'Connell (1993) closely (working response + working
-weights).
-}
-
-\section{Acknowledgments}{
-
-OpenAI's GPT models (such as GPT-5 Pro) were
-used to assist with coding and roxygen documentation; all
-content was reviewed and finalized by the author.
-}
-
 \section{Approximations}{
 
 \code{\link[=glmmFEL]{glmmFEL()}} supports:
 \itemize{
 \item \code{"Laplace"}: first-order Laplace approximation,
 \item \code{"FE_mean"}: fully exponential Laplace corrections to \eqn{\widehat\eta} only,
-\item \code{"FE_full"} (or \code{"FE"}): fully exponential Laplace corrections to both
-\eqn{\widehat\eta} and \eqn{\widehat{\mathrm{Var}}(\eta\mid y)},
+\item \code{"FE_full"} (or \code{"FE"}): mean corrections plus the posterior
+variance-diagonal corrections needed for the scalar variance update,
 \item \code{"RSPL"} / \code{"MSPL"}: restricted/marginal pseudo-likelihood
 (working response / working weights).
 }
@@ -85,7 +44,8 @@ content was reviewed and finalized by the author.
 \item \code{eta}: empirical Bayes predictions of random effects,
 \item \code{tau2}: the scalar variance component,
 \item \code{G}: \eqn{q\times q} covariance matrix (diagonal in this branch),
-\item \code{var_eta}: prediction-error covariance for \code{eta} (approx.),
+\item \code{var_eta}: approximate posterior covariance, with diagonal-only
+FEL covariance corrections in \code{FE_full},
 \item \code{vcov_beta}: approximate covariance of \code{beta} when available,
 \item \code{convergence}: iteration counts and flags.
 }
@@ -132,9 +92,14 @@ Generalized linear mixed models: a pseudo-likelihood approach.
 }
 \seealso{
 \code{\link[=glmmFEL_pl]{glmmFEL_pl()}} for
-the pseudo-likelihood engines.
+the pseudo-likelihood engines; \link{glmmFEL-benchmarks} for the simulation appraisal.
 }
 \author{
 \strong{Maintainer}: Andrew T. Karl \email{akarl@asu.edu} (\href{https://orcid.org/0000-0002-5933-8706}{ORCID})
+
+Authors:
+\itemize{
+  \item Andrew T. Karl \email{akarl@asu.edu} (\href{https://orcid.org/0000-0002-5933-8706}{ORCID})
+}
 
 }

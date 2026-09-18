@@ -8,7 +8,7 @@ glmmFEL_pl(
   y,
   X,
   Z,
-  family = c("binomial_probit", "binomial_logit", "poisson_log"),
+  family = "binomial_probit",
   approx = c("RSPL", "MSPL"),
   max_iter = 200L,
   tol = 1e-06,

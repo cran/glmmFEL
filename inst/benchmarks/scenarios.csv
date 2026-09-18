@@ -1,0 +1,13 @@
+"family","setting","scenario"
+"binomial_logit","small",1
+"binomial_probit","small",2
+"poisson_log","small",3
+"binomial_logit","rich",4
+"binomial_probit","rich",5
+"poisson_log","rich",6
+"binomial_logit","unbalanced",7
+"binomial_probit","unbalanced",8
+"poisson_log","unbalanced",9
+"binomial_logit","many_small",10
+"binomial_probit","many_small",11
+"poisson_log","many_small",12

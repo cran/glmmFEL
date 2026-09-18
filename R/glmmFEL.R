@@ -7,15 +7,13 @@
 #' * first-order Laplace (`approx = "Laplace"`),
 #' * fully exponential corrections to the random-effects mean
 #'   (`approx = "FE_mean"`),
-#' * fully exponential corrections to both mean and covariance
+#' * fully exponential corrections to both mean and variance diagonals
 #'   (`approx = "FE_full"` / `"FE"`),
 #' * pseudo-likelihood / PL linearization (`approx = "RSPL"` or `"MSPL"`)
 #'   via [glmmFEL_pl()].
 #'
-#' This **development branch is matrix-only**: you provide the response `y`,
-#' fixed-effects design matrix `X`, and random-effects design matrix `Z`.
-#' A formula interface (via optional 'lme4' helpers) and structured \eqn{G}
-#' parameterizations are in development.
+#' The interface is matrix-based: provide the response `y`, fixed-effects
+#' design matrix `X`, and random-effects design matrix `Z`.
 #'
 #' Random effects are assumed \eqn{\eta \sim N(0, G)} with a **single** variance
 #' component
@@ -29,11 +27,13 @@
 #'  Numeric response vector of length \eqn{n}. For
 #'  `family = "binomial_probit"` / `binomial(link = "probit")` or
 #'  `family = "binomial_logit"` / `binomial(link = "logit")`,
-#'  values must be 0 or 1.
+#'  values must be 0 or 1; grouped binomial counts and trial weights are not
+#'  supported. Poisson responses must be nonnegative integer counts.
 #' @param X
 #'  Fixed-effects design matrix of dimension \eqn{n \times p}. May be a
 #'  base R matrix or a matrix-like object; it is internally coerced to a
-#'  base numeric matrix. Must have full column rank.
+#'  base numeric matrix. Must have at least one column, finite entries, and
+#'  full column rank.
 #' @param Z
 #'  Random-effects design matrix of dimension \eqn{n \times q}. May be a
 #'  base R matrix or a \pkg{Matrix} object. Internally it is coerced to a
@@ -82,8 +82,43 @@
 #'    \item `beta_hess_ridge_max` (max ridge; default 1e2)
 #'  }
 #'
+#' @details
+#' `Laplace` denotes an EM algorithm using posterior modes in its expected
+#' score and Gaussian posterior second moments. It is not direct maximization
+#' of the first-order Laplace marginal likelihood (as in `lme4::glmer`).
+#' `FE_mean` adds mean and expected-score corrections. `FE_full` also corrects
+#' the posterior variance diagonals needed to update the single variance
+#' component; off-diagonal entries of `var_eta` remain at their Laplace values.
+#' Thus "full" distinguishes the two implemented EM stages, not a correction
+#' of every entry of an arbitrary posterior covariance matrix.
+#'
+#' Returned moments are recomputed at the final parameter estimates. A failed
+#' inner solve or exhausted iteration budget produces a warning and a false
+#' convergence flag. Always inspect `convergence` before interpreting estimates.
+#' Approximate posterior variances can become invalid in sparse/extreme settings;
+#' such fits are flagged rather than reported as converged.
+#' A strictly separating fixed-effect direction found at initialization is
+#' rejected for binary data, since no finite estimate exists. This sufficient
+#' check is not a complete detector of all forms of quasi-separation.
+#'
+#' `vcov_beta` is a joint-Hessian approximation conditional on the fitted
+#' variance component; it is not a fully exponential observed-information
+#' estimate and does not incorporate variance-component estimation uncertainty.
+#' For EM fits, `logLik` evaluates the first-order Laplace marginal likelihood
+#' at the returned estimates, which need not maximize it. For PL fits it is
+#' unavailable (`NA`); `working_logLik` stores the working Gaussian objective.
+#' These objectives should not be used for cross-method AIC comparisons.
+#' Fitted response values plug the estimated random effects into the inverse
+#' link; they are not posterior predictive averages over random effects.
+#'
+#' See [glmmFEL-benchmarks] for a reproducible simulation appraisal and its limits.
+#'
 #' @return
-#'  A fitted model object of class `glmmFELMod`.
+#' A fitted model object of class `glmmFELMod`, with estimates `beta`, `tau2`,
+#' random-effect predictions `eta`, approximate covariance matrices, and
+#' `convergence`. EM convergence diagnostics include `em_converged`, `reason`,
+#' `mode_converged`, `mode_gradient`, `beta_converged`, and `moments_valid`.
+#' PL fits report both `pql_converged` and `em_converged`.
 #'
 #' @template ref-doc
 #' @examples
@@ -142,27 +177,17 @@ glmmFEL <- function(
   ## -----------------------------
   ## Basic argument processing
   ## -----------------------------
-  y   <- as.numeric(y)
-  X   <- glmmfe_as_X(X)
+  X <- glmmfe_as_X(X)
   Z_M <- glmmfe_as_Z(Z, n = length(y))
-
-  n <- length(y)
-  if (nrow(X) != n || nrow(Z_M) != n) {
-    stop("y, X, and Z must have the same number of rows/observations.")
-  }
-
-  p <- ncol(X)
-  q <- ncol(Z_M)
-  if (q == 0L) stop("Z must have at least one random-effects column.")
-
-  rankX <- qr(X)$rank
-  if (rankX < p) stop("Fixed-effects design matrix X is not full rank; remove collinear columns from X.")
+  glmmfe_validate_data(y, X, Z_M, fam_name)
+  y <- as.numeric(y)
+  n <- length(y); p <- ncol(X); q <- ncol(Z_M)
 
   ## -----------------------------
   ## Dispatch to pseudo-likelihood engine (RSPL/MSPL)
   ## -----------------------------
   if (approx_lab %in% c("RSPL", "MSPL")) {
-    return(glmmFEL_pl(
+    fit <- glmmFEL_pl(
       y        = y,
       X        = X,
       Z        = Z_M,
@@ -171,11 +196,9 @@ glmmFEL <- function(
       max_iter = max_iter,
       tol      = tol,
       control  = control
-    ))
-  }
-
-  if (!requireNamespace("numDeriv", quietly = TRUE)) {
-    stop("Package 'numDeriv' is required for glmmFEL(). Please install it.")
+    )
+    fit$call <- match.call()
+    return(fit)
   }
 
   ## -----------------------------
@@ -209,9 +232,7 @@ glmmFEL <- function(
 
     verbose       = FALSE
   )
-  if (length(control) > 0L) {
-    for (nm in names(control)) ctrl[[nm]] <- control[[nm]]
-  }
+  ctrl <- glmmfe_validate_control(control, ctrl)
   if (is.null(ctrl$tol_laplace)) ctrl$tol_laplace <- 10 * ctrl$em_tol
   if (is.null(ctrl$tol_fe_mean)) ctrl$tol_fe_mean <- 3 * ctrl$em_tol
   if (is.null(ctrl$tol_fe_full)) ctrl$tol_fe_full <- ctrl$em_tol
@@ -226,6 +247,7 @@ glmmFEL <- function(
   ## Initial values
   ## -----------------------------
   beta <- fam_spec$init_beta()
+  glmmfe_check_separation(y, X, beta, fam_name)
   eta  <- rep(0, q)
 
   tau2 <- as.numeric(ctrl$tau2_init)
@@ -236,239 +258,20 @@ glmmFEL <- function(
   G       <- Matrix::Diagonal(q, x = rep.int(tau2, q))
   var_eta <- as.matrix(G)
 
-  ## -----------------------------
-  ## Newton helper for eta (Laplace mode + Laplace var_eta = Sigma^{-1})
-  ##
-  ## Paper mapping (Karl et al.):
-  ##   L(eta)   is the gradient of NEG log-posterior:
-  ##     L(eta) = -Z' * (d/deta log f(y|eta)) + G^{-1} eta
-  ##   Sigma    is the NEG Hessian at the mode.
-  ## -----------------------------
   update_eta_laplace <- function(eta_init, beta, tau2) {
-    eta <- as.numeric(eta_init)
-
-    inv_tau2 <- 1 / max(tau2, ctrl$vc_eps)
-    G_inv    <- diag(inv_tau2, q)
-
-    var_eta_loc <- diag(1, q)
-
-    for (it in seq_len(ctrl$eta_max_iter)) {
-      comp <- fam_spec$E_R2_R3(beta, eta)
-      E    <- comp$E
-      R2   <- comp$R2
-
-      ## grad of NEG log-posterior:  grad = -Z' E + G^{-1} eta
-      grad_r <- as.numeric(Matrix::crossprod(Z_M, E))
-      grad_p <- - as.numeric(G_inv %*% eta)
-      grad   <- - (grad_r + grad_p)
-
-      ## Sigma = G^{-1} + Z' diag(-R2) Z
-      temp <- -R2
-      H <- G_inv + as.matrix(Matrix::crossprod(Z_M, Z_M * temp))
-      H <- 0.5 * (H + t(H))
-
-      H_chol <- tryCatch(chol(H), error = function(e) NULL)
-      if (!is.null(H_chol)) {
-        var_eta_loc <- chol2inv(H_chol)
-      } else {
-        var_eta_loc <- tryCatch(solve(H), error = function(e) diag(1, q))
-      }
-
-      step <- var_eta_loc %*% grad
-
-      ## Newton convergence criterion aligned with grad' * step
-      crit <- as.numeric(crossprod(grad, step))
-      if (!is.finite(crit) || crit <= ctrl$eta_tol_grad) break
-
-      eta <- eta - as.numeric(step)
-    }
-
-    var_eta_loc <- 0.5 * (var_eta_loc + t(var_eta_loc))
-    list(eta = eta, var_eta = var_eta_loc)
+    glmmfe_mode(eta_init, beta, tau2, y, X, Z_M, fam_name, fam_spec, ctrl)
   }
-
-  ## -----------------------------
-  ## Newton helper for beta (robust + sparse-friendly)
-  ##
-  ## Safe changes implemented:
-  ##  (1) keep Z sparse (no densification)
-  ##  (2) avoid forming dense n×q intermediates Svar2/temp.C
-  ##  (3) PRECOMPUTE row_qf = diag(Z var_eta0 Z') ONCE per update_beta()
-  ##      (depends on var_eta0, not on b), so numDeriv Jacobian is much cheaper.
-  ##  (4) ridge/line-search are "fallback only" to preserve equivalence as much as possible:
-  ##      - first try plain solve(H, score)
-  ##      - use ridge only if solve fails
-  ##      - line-search only if full Newton step fails to reduce score norm
-  ## -----------------------------
-  update_beta <- function(beta, eta0, var_eta0, phase) {
-
-    if (phase == 1L) {
-      score_fun <- function(b) {
-        comp <- fam_spec$E_R2_R3(b, eta0)
-        E    <- comp$E
-        as.numeric(crossprod(X, E))
-      }
-    } else {
-
-      ## dgCMatrix slot access for O(nnz) accumulation
-      Zp <- Z_M@p
-      Zi <- Z_M@i
-      Zx <- Z_M@x
-
-      use_full_M <- (as.double(n) * as.double(q) <= as.double(ctrl$max_nq_mem))
-
-      ## PRECOMPUTE row_qf[i] = z_i' var_eta0 z_i, once per update_beta() call
-      row_qf <- numeric(n)
-
-      if (use_full_M) {
-        ## M = Z %*% var_eta0 (dense n×q), formed once per beta update
-        M <- as.matrix(Z_M %*% var_eta0)
-
-        ## row_qf[rows] += Z_rc * M_rc across nnz(Z)
-        for (col in seq_len(q)) {
-          lo <- Zp[col] + 1L
-          hi <- Zp[col + 1L]
-          if (hi >= lo) {
-            idx  <- lo:hi
-            rows <- Zi[idx] + 1L
-            vals <- Zx[idx]
-            row_qf[rows] <- row_qf[rows] + vals * M[rows, col]
-          }
-        }
-      } else {
-        ## memory-guarded: compute M[,col] on the fly per column; still only once per beta update
-        for (col in seq_len(q)) {
-          lo <- Zp[col] + 1L
-          hi <- Zp[col + 1L]
-          if (hi >= lo) {
-            Mj <- as.numeric(Z_M %*% var_eta0[, col])  # length n
-            idx  <- lo:hi
-            rows <- Zi[idx] + 1L
-            vals <- Zx[idx]
-            row_qf[rows] <- row_qf[rows] + vals * Mj[rows]
-          }
-        }
-      }
-
-      score_fun <- function(b) {
-        comp <- fam_spec$E_R2_R3(b, eta0)
-        E    <- comp$E
-        R2   <- comp$R2
-        R3   <- comp$R3
-
-        ## term1 = (z_i' var_eta0 z_i) * R3_i
-        term1 <- row_qf * as.numeric(R3)
-
-        ## bvec = (Z var_eta0)' term1 = var_eta0 %*% (Z' term1)
-        zTa  <- as.numeric(Matrix::crossprod(Z_M, term1))  # q
-        bvec <- as.numeric(var_eta0 %*% zTa)               # q
-
-        ## term2 = R2 ∘ (Z bvec)
-        term2 <- as.numeric(R2) * as.numeric(Z_M %*% bvec) # n
-
-        trc_beta <- term1 + term2
-
-        as.numeric(crossprod(X, E + 0.5 * trc_beta))
-      }
+  moments <- function(lap, beta, phase) {
+    mean <- lap$eta; variance <- lap$var_eta
+    if (phase > 1L && all(is.finite(variance))) {
+      d <- fam_spec$FE_trace_inputs(beta, lap$eta)
+      fe <- fe_trace_diagG(Z_M, variance, d$temp_trc_C, d$temp_trc_D,
+                          max_nq_mem = ctrl$max_nq_mem)
+      mean <- mean + 0.5 * fe$trc_y1
+      if (phase == 3L) diag(variance) <- diag(variance) + 0.5 * Matrix::diag(fe$trc_y2)
     }
-
-    b <- as.numeric(beta)
-
-    for (it in seq_len(ctrl$beta_max_iter)) {
-      score <- score_fun(b)
-      if (!all(is.finite(score))) break
-
-      smax <- max(abs(score))
-      if (!is.finite(smax) || smax < ctrl$beta_tol) break
-
-      ## Numerical Jacobian of score
-      H <- tryCatch(numDeriv::jacobian(score_fun, b),
-                    error = function(e) NULL)
-      if (is.null(H) || any(!is.finite(H))) {
-        if (isTRUE(ctrl$verbose)) message("beta Newton Jacobian failed; leaving beta unchanged for this EM iteration.")
-        break
-      }
-      H <- 0.5 * (H + t(H))
-
-      ## Try plain Newton solve first (most equivalent to previous behavior)
-      step <- tryCatch(solve(H, score), error = function(e) NULL)
-
-      ## If plain solve fails, use ridge escalation (fallback only)
-      if (is.null(step) || any(!is.finite(step))) {
-        ridge <- as.numeric(ctrl$beta_hess_ridge_init)
-        step <- NULL
-
-        repeat {
-          Hr <- H + diag(ridge, length(b))
-          step_try <- tryCatch(solve(Hr, score), error = function(e) NULL)
-
-          if (!is.null(step_try) && all(is.finite(step_try))) {
-            step <- step_try
-            break
-          }
-
-          ridge <- ridge * 10
-          if (!is.finite(ridge) || ridge > ctrl$beta_hess_ridge_max) break
-        }
-
-        if (is.null(step) || any(!is.finite(step))) {
-          if (isTRUE(ctrl$verbose)) message("beta Newton solve failed (even with ridge); leaving beta unchanged for this EM iteration.")
-          break
-        }
-      }
-
-      ## Cap step size (inf norm) (safe numerical guard)
-      step_inf <- max(abs(step))
-      if (is.finite(step_inf) && step_inf > ctrl$beta_step_max) {
-        step <- step * (ctrl$beta_step_max / step_inf)
-      }
-
-      ## Accept full step if it reduces score norm; otherwise do backtracking (fallback only)
-      score_norm0 <- max(abs(score))
-
-      b_full <- b - as.numeric(step)
-      score_full <- score_fun(b_full)
-      score_norm_full <- if (all(is.finite(score_full))) max(abs(score_full)) else Inf
-
-      if (is.finite(score_norm_full) && score_norm_full <= (1 - 1e-4) * score_norm0) {
-        b <- b_full
-        next
-      }
-
-      ## Backtracking line search
-      alpha <- 1.0
-      accepted <- FALSE
-
-      for (ls in seq_len(as.integer(ctrl$beta_ls_max_iter))) {
-        b_new <- b - alpha * as.numeric(step)
-        score_new <- score_fun(b_new)
-
-        if (all(is.finite(score_new))) {
-          score_norm1 <- max(abs(score_new))
-          if (is.finite(score_norm1) && score_norm1 <= (1 - 1e-4 * alpha) * score_norm0) {
-            b <- b_new
-            accepted <- TRUE
-            break
-          }
-        }
-
-        alpha <- alpha / 2
-      }
-
-      if (!accepted) {
-        ## If line search fails, take a very small step if it improves at all; else bail.
-        b_try <- b - 1e-3 * as.numeric(step)
-        score_try <- score_fun(b_try)
-        if (all(is.finite(score_try)) && max(abs(score_try)) < score_norm0) {
-          b <- b_try
-        } else {
-          if (isTRUE(ctrl$verbose)) message("beta line search failed; leaving beta unchanged for this EM iteration.")
-          break
-        }
-      }
-    }
-
-    b
+    list(mean = mean, variance = variance,
+         valid = all(is.finite(mean)) && all(is.finite(variance)) && all(diag(variance) >= 0))
   }
 
   ## -----------------------------
@@ -477,9 +280,13 @@ glmmFEL <- function(
   em_converged <- FALSE
   iter_used    <- 0L
   phase        <- 1L
+  phase_used <- 1L
+  failure_reason <- "iteration_limit"
+  beta_info <- list(converged = FALSE, score = Inf, reason = "not_run")
 
   for (iter in seq_len(ctrl$em_max_iter)) {
     iter_used <- iter
+    phase_used <- phase
     beta_old  <- beta
     tau2_old  <- tau2
 
@@ -488,43 +295,10 @@ glmmFEL <- function(
     eta0     <- lap$eta
     var_eta0 <- lap$var_eta
 
-    ## FE corrections (if phase > 1)
-    if (phase == 1L) {
-      eta_hat     <- eta0
-      var_eta_hat <- var_eta0
-    } else {
-      fe_inp <- fam_spec$FE_trace_inputs(beta, eta0)
-
-      fe <- fe_trace_diagG(
-        Z           = Z_M,
-        var_eta     = var_eta0,
-        temp_trc_C  = fe_inp$temp_trc_C,
-        temp_trc_D  = fe_inp$temp_trc_D,
-        max_nq_mem  = ctrl$max_nq_mem
-      )
-
-      trc_y1 <- fe$trc_y1
-      trc_y2 <- fe$trc_y2
-
-      ## Mean correction: eta_hat = eta_mode + 0.5 * trc_y1
-      eta_hat <- eta0 + 0.5 * trc_y1
-
-      if (approx_lab == "FE_mean") {
-        var_eta_hat <- var_eta0
-      } else {
-        ## FE_full: stage covariance correction only in phase 3 (after FE-mean stabilizes)
-        if (phase < 3L) {
-          var_eta_hat <- var_eta0
-        } else {
-          ## trc_y2 is a Matrix::Diagonal (S4). Apply diagonal-only correction safely.
-          var_eta_hat <- as.matrix(var_eta0)
-          diag(var_eta_hat) <- diag(var_eta_hat) + 0.5 * Matrix::diag(trc_y2)
-        }
-      }
-
-      ## symmetry guard (keeps type as base matrix)
-      var_eta_hat <- 0.5 * (var_eta_hat + t(var_eta_hat))
-    }
+    if (!lap$converged) { failure_reason <- lap$reason; break }
+    mom <- moments(lap, beta, phase)
+    if (!mom$valid) { failure_reason <- "invalid_posterior_moments"; break }
+    eta_hat <- mom$mean; var_eta_hat <- mom$variance
 
     ## Update tau2 using FE-corrected moments (or Laplace moments in phase 1):
     tau2 <- mean(diag(var_eta_hat) + eta_hat^2)
@@ -532,10 +306,12 @@ glmmFEL <- function(
     G    <- Matrix::Diagonal(q, x = rep.int(tau2, q))
 
     ## Update beta (robust Newton)
-    beta <- update_beta(beta = beta, eta0 = eta0, var_eta0 = var_eta0, phase = phase)
+    beta_info <- glmmfe_beta_update(beta, eta0, var_eta0, phase, X, Z_M, fam_spec, ctrl)
+    beta <- beta_info$beta
+    if (!beta_info$converged) { failure_reason <- beta_info$reason; break }
 
     ## carry forward FE-corrected (or Laplace) eta moments
-    eta     <- eta_hat
+    eta     <- eta0  # Warm-start the next mode at the previous mode, not its FE shift.
     var_eta <- var_eta_hat
 
     ## convergence check on (beta, tau2)
@@ -588,6 +364,13 @@ glmmFEL <- function(
   ## -----------------------------
   lap_final <- update_eta_laplace(eta_init = eta, beta = beta, tau2 = tau2)
   eta_mode  <- lap_final$eta
+  final_mom <- moments(lap_final, beta, phase_used)
+  eta <- final_mom$mean
+  var_eta <- final_mom$variance
+  em_converged <- em_converged && lap_final$converged && final_mom$valid
+  if (em_converged) failure_reason <- "converged"
+  if (!lap_final$converged) failure_reason <- lap_final$reason
+  if (!final_mom$valid) failure_reason <- "invalid_posterior_moments"
 
   comp  <- fam_spec$E_R2_R3(beta, eta_mode)
   R2    <- comp$R2
@@ -614,6 +397,10 @@ glmmFEL <- function(
   chol_Hjoint <- tryCatch(chol(H_joint), error = function(e) e)
   cov_pd <- !inherits(chol_Hjoint, "error")
   cov_err <- if (!cov_pd) conditionMessage(chol_Hjoint) else NA_character_
+  if (!cov_pd) {
+    em_converged <- FALSE
+    failure_reason <- "fixed_effects_information_not_positive_definite"
+  }
 
   if (cov_pd) {
     vcov_joint <- chol2inv(chol_Hjoint)
@@ -631,7 +418,13 @@ glmmFEL <- function(
   convergence <- list(
     em_converged = em_converged,
     em_iter      = iter_used,
-    phase        = phase,
+    phase        = phase_used,
+    reason       = failure_reason,
+    mode_converged = lap_final$converged,
+    mode_gradient = lap_final$gradient,
+    beta_converged = beta_info$converged,
+    beta_score = beta_info$score,
+    moments_valid = final_mom$valid,
     tol_laplace  = ctrl$tol_laplace,
     tol_fe_mean  = ctrl$tol_fe_mean,
     tol_fe_full  = ctrl$tol_fe_full,
@@ -694,6 +487,8 @@ glmmFEL <- function(
   ## store Laplace mode used for covariance/logLik
   fit$eta_mode     <- eta_mode
   fit$var_eta_mode <- lap_final$var_eta
+  fit$logLik_type <- "Laplace marginal log-likelihood evaluated at the EM estimates"
+  if (!em_converged) warning("glmmFEL did not converge: ", failure_reason, call. = FALSE)
 
   fit
 }

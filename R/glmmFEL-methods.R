@@ -141,7 +141,10 @@ coef.glmmFELMod <- function(object, ...) {
 #'   names when available.
 #' @export
 vcov.glmmFELMod <- function(object, ...) {
-  object$vcov_beta
+  covariance <- object$vcov_beta
+  if (!is.null(covariance) && !is.null(colnames(object$X)))
+    dimnames(covariance) <- list(colnames(object$X), colnames(object$X))
+  covariance
 }
 
 #' Extract fitted values
@@ -199,7 +202,7 @@ predict.glmmFELMod <- function(object, newdata = NULL, type = c("response", "lin
 #' @param object A `glmmFELMod` object.
 #' @param ... Unused.
 #' @return An object of class `"logLik"` giving the approximate log-likelihood
-#'   stored in `object$logLik`, with attributes `"df"` (effective number of
+#'   stored in `object$logLik` (NA for PL fits), with attributes `"df"` (effective number of
 #'   parameters, taken as `length(beta) + 1` for the variance component) and
 #'   `"nobs"` (number of observations).
 #' @export

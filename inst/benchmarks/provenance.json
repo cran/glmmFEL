@@ -1,0 +1,47 @@
+{
+  "raw_rows": 24000,
+  "datasets": 2400,
+  "raw_sha256": "53d6fee64a7651a4c8441b74d7fb36a6436daec35c9024ec1726358ac6db18ff",
+  "launch_manifest_sha256": "f12e1e7d4a1bbad0389d3bd9cf5b300416ad75892e176e5bbaa19c0182b3cdc4",
+  "summarizer_sha256": "68af7b8687f4f0f4347784b81662474a9357e6924f5eb743148f07c2a7c1114d",
+  "package": "glmmFEL",
+  "version": "1.0.6",
+  "date": "2026-09-18",
+  "replicates_per_cell": 200,
+  "main_seed_formula": "8300000 + 10000 * scenario + replicate",
+  "rng": "R 4.6.1 defaults: Mersenne-Twister, Inversion, Rejection",
+  "source_hashes": {
+    "common.R": "e9593daa4e67773feb9c58a197df13bd07bb924f4027f9dd3fd5ac236c3d260d",
+    "DESCRIPTION": "1e3a103a8ced6dee0ce8bf25be00fc326f3b71ba4108620a803c70d33ddd639a",
+    "jobs.csv": "ad2fe18337f4fedbb9c14f2e22568cdf84623eb2cf06365cfa06ff17047518d7",
+    "PLAN.md": "1764d1f2cf778b6ffd4c83d7861b5caa022db43ad6df6643007387db26f09c80",
+    "R/fe_derivatives.R": "f6b6ccd49e866a03b9893cc947768b3e57887380f836e8b9f4f6e6b62181f95c",
+    "R/fe_trace.R": "672dc25af5c31f31e160cedd8c7060d3175dc2ca8e49a23ebad6b247f3b96447",
+    "R/Gaussian_helpers.R": "22577d8d655388eb5dc604a5046be9d6eac54ac0c90bb62816200bb07df33547",
+    "R/glmmFEL-benchmarks.R": "095f15b2ec19ae75a84db48910b8b54772ecc12177ef818007ea7f5776c9f384",
+    "R/glmmFEL-helpers.R": "a5ddb969c0b0c58d0fe0530bbfbb6e7d96211689d36d686090999e4f7a5b7470",
+    "R/glmmFEL-methods.R": "b545c8f132f516243c36057c38578f749bf1fe7a74b3cbf687c4934f9ecf4aa4",
+    "R/glmmFEL-package.R": "d9a9628660688c54a27b38123b90281cda021a33fcfae2713e4986992a4ef8c7",
+    "R/glmmFEL.R": "77830d4c34ea674901b6e9843dd0cf104ccd9e9b330f0bd67fc4c89975d8079f",
+    "R/glmmFEL_PL.R": "18e9dc9c7888864b0b5338248f070ccc783ed896673497dca412f03cf739aba8",
+    "R/numerical_helpers.R": "cb802f7451ec9fe5f33e776a3aa1b2734214e5b13e7bedda3511a32746a05de6",
+    "run.R": "3ecb1b88c4d7d5abb0818b1af43f80a447e79b83a0bf778d5bf4cc2d91ff27a3",
+    "scenarios.csv": "51cd4ccd493f298f7e9ead49ebb4ab6b68f74cb6276275a901d8ac69d85a230f"
+  },
+  "runtime": [
+    "started 2026-09-18 10:08:58.613933",
+    "finished 2026-09-18 10:42:11.939506",
+    "elapsed_seconds 1993.3261578083"
+  ],
+  "stress_raw_sha256": "641734a25f78fda02a57a6d78543e1f2ae269b99119d7dc10bd08359d3174d58",
+  "stress_script_sha256": "107f1450ee91f5348efcb54ee8ede5ba76c30a209712259dbda91defc94c9237",
+  "separation_audit": [
+    "PASS: 1600 binary datasets checked; no study dataset is excluded by the separation guard."
+  ],
+  "release_equivalence": [
+    "All 60 fits (one prespecified main-run seed per cell, five internal methods)",
+    "are bitwise identical to the frozen implementation, excluding elapsed time.",
+    "Post-launch changes: vcov() dimnames, rejection of NULL required controls,",
+    "certified complete-separation guard (absent in benchmark data), documentation."
+  ]
+}

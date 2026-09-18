@@ -2,8 +2,8 @@ Package: glmmFEL
 Type: Package
 Title: Generalized Linear Mixed Models via Fully Exponential Laplace in
         EM
-Version: 1.0.5
-Date: 2026-01-07
+Version: 1.0.6
+Date: 2026-09-18
 Authors@R: 
     person(given = "Andrew T.",
            family = "Karl",
@@ -12,7 +12,7 @@ Authors@R:
            comment = c(ORCID = "0000-0002-5933-8706"))
 Description: Fit generalized linear mixed models (GLMMs) with normal random
     effects using first-order Laplace, fully exponential Laplace (FEL) with
-    mean-only corrections, and FEL with mean and covariance corrections in
+    mean-only corrections, and FEL with mean and variance-diagonal corrections in
     the E-step of an expectation-maximization (EM) algorithm. The current
     development version provides a matrix-based interface (y, X, Z) and
     supports binary logit and probit, and Poisson log-link models. An EM
@@ -32,15 +32,14 @@ Description: Fit generalized linear mixed models (GLMMs) with normal random
     generative AI tools.
 License: GPL-3
 Encoding: UTF-8
-Imports: Matrix, numDeriv, stats, methods
-Suggests: testthat (>= 3.0.0), MASS, knitr, rmarkdown, nlme,
-        mvglmmRank, lme4
+Imports: Matrix, stats, methods
+Suggests: testthat (>= 3.0.0), lme4, numDeriv
 Config/testthat/edition: 3
-RoxygenNote: 7.3.3
 NeedsCompilation: no
-Packaged: 2026-01-07 15:28:41 UTC; andre
+Config/roxygen2/version: 8.1.0
+Packaged: 2026-09-18 17:04:56 UTC; andre
 Author: Andrew T. Karl [cre, aut] (ORCID:
     <https://orcid.org/0000-0002-5933-8706>)
 Maintainer: Andrew T. Karl <akarl@asu.edu>
 Repository: CRAN
-Date/Publication: 2026-01-09 14:50:02 UTC
+Date/Publication: 2026-09-18 17:20:02 UTC

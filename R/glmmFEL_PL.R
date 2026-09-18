@@ -13,7 +13,7 @@
 #' @keywords internal
 glmmFEL_pl <- function(
     y, X, Z,
-    family   = c("binomial_probit", "binomial_logit", "poisson_log"),
+    family   = "binomial_probit",
     approx   = c("RSPL", "MSPL"),
     max_iter = 200L,
     tol      = 1e-6,
@@ -24,9 +24,10 @@ glmmFEL_pl <- function(
   if (!approx %in% c("RSPL", "MSPL")) stop("glmmFEL_pl only supports approx = RSPL or MSPL.")
 
   ## Inputs
-  y <- as.numeric(y)
   X <- glmmfe_as_X(X)
   Z <- glmmfe_as_Z(Z, n = length(y))
+  glmmfe_validate_data(y, X, Z, fam_name)
+  y <- as.numeric(y)
 
   n <- length(y)
   p <- ncol(X)
@@ -52,7 +53,7 @@ glmmFEL_pl <- function(
 
   ## Controls
   ctrl <- list(
-    pql_max_iter = as.integer(max_iter),
+    pql_max_iter = max_iter,
     pql_tol      = tol,
 
     em_max_iter  = 50L,
@@ -67,7 +68,7 @@ glmmFEL_pl <- function(
     verbose      = FALSE,
     trace        = FALSE
   )
-  if (length(control) > 0L) ctrl <- utils::modifyList(ctrl, control)
+  ctrl <- glmmfe_validate_control(control, ctrl)
 
   ## Basic init: fixed-only GLM start (stable)
   beta <- rep(0, p)
@@ -80,6 +81,7 @@ glmmFEL_pl <- function(
     if (length(b0) == p) beta <- b0
   }
   if (!is.null(colnames(X))) names(beta) <- colnames(X)
+  glmmfe_check_separation(y, X, beta, fam_name)
 
   eta  <- rep(0, q)
 
@@ -103,6 +105,7 @@ glmmFEL_pl <- function(
     iter_used <- it
     beta_old_outer <- beta
     tau2_old_outer <- tau2
+    eta_old_outer <- eta
 
     ## Linear predictor and mean
     eta_lin <- as.numeric(X %*% beta + Z %*% eta)
@@ -170,9 +173,9 @@ glmmFEL_pl <- function(
       pl_trace <- c(pl_trace, pl_val)
     }
 
-    ## Outer convergence on (beta, tau2)
-    theta_old_outer <- c(beta_old_outer, tau2_old_outer)
-    theta_new_outer <- c(beta, tau2)
+    ## Outer convergence on (beta, tau2, eta), requiring the inner solve as well.
+    theta_old_outer <- c(beta_old_outer, tau2_old_outer, eta_old_outer)
+    theta_new_outer <- c(beta, tau2, eta)
 
     num <- max(abs(theta_new_outer - theta_old_outer))
     den <- max(1, max(abs(theta_old_outer)))
@@ -187,11 +190,20 @@ glmmFEL_pl <- function(
           " em_iters:", em_iters_last, "\n")
     }
 
-    if (delta_outer < ctrl$pql_tol) {
+    if (delta_outer < ctrl$pql_tol && em_converged) {
       pql_converged <- TRUE
       break
     }
   }
+
+  # Refresh working quantities and covariance at the returned parameter values.
+  final_linear <- as.numeric(X %*% beta + Z %*% eta)
+  mu <- fam_obj$linkinv(final_linear)
+  dmu <- pmax(fam_obj$mu.eta(final_linear), 1e-12)
+  w_last <- dmu^2 / pmax(fam_obj$variance(mu), 1e-12)
+  z_last <- final_linear + (y - mu) / dmu
+  inner_last <- glmmfe_lmm_inner_fit(z_last, w_last, X, Z, tau2, approx,
+                                    ctrl$vc_eps, ctrl$lmm_ridge_init)
 
   ## Final covariance outputs
   vcov_beta    <- if (!is.null(inner_last)) inner_last$vcov_beta else NULL
@@ -205,7 +217,7 @@ glmmFEL_pl <- function(
     var_eta_post
   }
 
-  ## Store a PL objective as logLik (vp_cp style, INCLUDING constants)
+  ## Retain the working Gaussian objective separately from a GLMM likelihood.
   logLik_val <- NA_real_
   if (!is.null(inner_last) && !is.null(w_last) && !is.null(z_last)) {
     logLik_val <- glmmfe_pl_objective(
@@ -236,15 +248,20 @@ glmmFEL_pl <- function(
       pql_converged = pql_converged,
       pql_iter = iter_used,
       em_iter_last = em_iters_last,
+      em_converged = em_converged,
+      reason = if (pql_converged) "converged" else "iteration_limit",
       pl_trace = pl_trace
     ),
-    logLik = logLik_val,
+    logLik = NA_real_,
     call = match.call(),
     reml = identical(approx, "RSPL")
   )
 
   fit$var_eta_post <- var_eta_post
   fit$var_eta_used <- var_eta_used
+  fit$working_logLik <- logLik_val
+  fit$logLik_type <- "working Gaussian objective only; GLMM likelihood unavailable"
+  if (!pql_converged) warning("glmmFEL pseudo-likelihood did not converge: iteration_limit", call. = FALSE)
 
   fit
 }

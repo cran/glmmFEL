@@ -1,0 +1,16 @@
+{
+  "assembly": "Analysis only: replace three EM methods with 2000-iteration fits; reuse unchanged comparators on the same first 40 seeds.",
+  "files": {
+    "main_raw.csv": "53d6fee64a7651a4c8441b74d7fb36a6436daec35c9024ec1726358ac6db18ff",
+    "main_launch_manifest": "f12e1e7d4a1bbad0389d3bd9cf5b300416ad75892e176e5bbaa19c0182b3cdc4",
+    "sensitivity_raw.csv": "e0390da497365859ff748892d8b4603a1b58a2af382f67fcacf3dc0283768796",
+    "sensitivity.R": "c85b325a71d04103d2cad1579d9aa5e5044a97bc56121003cd8121af55806ea0",
+    "sensitivity_plan": "65aa1e624f1cfeac5558e6aba2d49a31b0714e8bfafdc8f85ea33b62eae044ca",
+    "sensitivity_jobs.csv": "fe02cb14d91be7f808bbbfe3172e9980b28279315e645a209fbdc4e56eb6e56c"
+  },
+  "runtime": [
+    "started 2026-09-18 10:34:09.794626",
+    "finished 2026-09-18 10:43:13.441795",
+    "elapsed_seconds 543.647636890411"
+  ]
+}

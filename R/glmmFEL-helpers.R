@@ -43,6 +43,7 @@
 #' @keywords internal
 glmmfe_resolve_family <- function(family) {
   if (is.character(family)) {
+    if (length(family) != 1L || is.na(family)) stop("family must be a single label.")
     fam <- tolower(family)
     if (fam %in% c("binomial_probit", "binomial-probit", "probit")) return("binomial_probit")
     if (fam %in% c("binomial_logit", "binomial-logit", "logit", "logistic")) return("binomial_logit")
@@ -77,7 +78,7 @@ glmmfe_resolve_family <- function(family) {
 #' @keywords internal
 glmmfe_resolve_approx <- function(approx) {
   if (length(approx) != 1L) approx <- approx[1L]
-  if (!is.character(approx)) stop("approx must be a character string.")
+  if (!is.character(approx) || length(approx) != 1L || is.na(approx)) stop("approx must be a character string.")
 
   a <- tolower(approx)
 
@@ -116,7 +117,7 @@ glmmfe_as_Z <- function(Z, n = NULL) {
 
   # Coerce to dgCMatrix for consistent sparse ops
   if (!inherits(Zs, "dgCMatrix")) {
-    Zs <- methods::as(Zs, "dgCMatrix")
+    Zs <- methods::as(methods::as(methods::as(Zs, "dMatrix"), "generalMatrix"), "CsparseMatrix")
   }
 
   # Optional dimension check (used by PL engine)

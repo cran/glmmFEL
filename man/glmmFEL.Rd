@@ -19,11 +19,13 @@ glmmFEL(
 \item{y}{Numeric response vector of length \eqn{n}. For
 \code{family = "binomial_probit"} / \code{binomial(link = "probit")} or
 \code{family = "binomial_logit"} / \code{binomial(link = "logit")},
-values must be 0 or 1.}
+values must be 0 or 1; grouped binomial counts and trial weights are not
+supported. Poisson responses must be nonnegative integer counts.}
 
 \item{X}{Fixed-effects design matrix of dimension \eqn{n \times p}. May be a
 base R matrix or a matrix-like object; it is internally coerced to a
-base numeric matrix. Must have full column rank.}
+base numeric matrix. Must have at least one column, finite entries, and
+full column rank.}
 
 \item{Z}{Random-effects design matrix of dimension \eqn{n \times q}. May be a
 base R matrix or a \pkg{Matrix} object. Internally it is coerced to a
@@ -74,7 +76,11 @@ and \code{control$tol_fe_full}.}
 }}
 }
 \value{
-A fitted model object of class \code{glmmFELMod}.
+A fitted model object of class \code{glmmFELMod}, with estimates \code{beta}, \code{tau2},
+random-effect predictions \code{eta}, approximate covariance matrices, and
+\code{convergence}. EM convergence diagnostics include \code{em_converged}, \code{reason},
+\code{mode_converged}, \code{mode_gradient}, \code{beta_converged}, and \code{moments_valid}.
+PL fits report both \code{pql_converged} and \code{em_converged}.
 }
 \description{
 \code{glmmFEL()} fits a generalized linear mixed model (GLMM) with multivariate
@@ -83,16 +89,14 @@ normal random effects using EM-type algorithms and likelihood approximations:
 \item first-order Laplace (\code{approx = "Laplace"}),
 \item fully exponential corrections to the random-effects mean
 (\code{approx = "FE_mean"}),
-\item fully exponential corrections to both mean and covariance
+\item fully exponential corrections to both mean and variance diagonals
 (\code{approx = "FE_full"} / \code{"FE"}),
 \item pseudo-likelihood / PL linearization (\code{approx = "RSPL"} or \code{"MSPL"})
 via \code{\link[=glmmFEL_pl]{glmmFEL_pl()}}.
 }
 
-This \strong{development branch is matrix-only}: you provide the response \code{y},
-fixed-effects design matrix \code{X}, and random-effects design matrix \code{Z}.
-A formula interface (via optional 'lme4' helpers) and structured \eqn{G}
-parameterizations are in development.
+The interface is matrix-based: provide the response \code{y}, fixed-effects
+design matrix \code{X}, and random-effects design matrix \code{Z}.
 
 Random effects are assumed \eqn{\eta \sim N(0, G)} with a \strong{single} variance
 component
@@ -100,47 +104,37 @@ component
 allowing arbitrary (including multi-membership) \code{Z} while keeping the variance
 update simple and stable.
 }
-\section{NOTE}{
+\details{
+\code{Laplace} denotes an EM algorithm using posterior modes in its expected
+score and Gaussian posterior second moments. It is not direct maximization
+of the first-order Laplace marginal likelihood (as in \code{lme4::glmer}).
+\code{FE_mean} adds mean and expected-score corrections. \code{FE_full} also corrects
+the posterior variance diagonals needed to update the single variance
+component; off-diagonal entries of \code{var_eta} remain at their Laplace values.
+Thus "full" distinguishes the two implemented EM stages, not a correction
+of every entry of an arbitrary posterior covariance matrix.
 
-This matrix-only development branch is a streamlined rewrite based on the
-binary/Poisson engines in \pkg{mvglmmRank} (which were based on Karl, Yang,
-and Lohr, 2014). The fully exponential Laplace EM strategy is described in
-Karl, Yang, and Lohr (2014) and related fully exponential Laplace work such
-as Tierney, Kass, and Kadane (1989) and Rizopoulos, Verbeke, and Lesaffre (2009);
-the FE-within-EM lineage is attributed to Steele (1996). Karl, Yang, and Lohr (2014)
-referenced the source code of package JM when writing their own code.
+Returned moments are recomputed at the final parameter estimates. A failed
+inner solve or exhausted iteration budget produces a warning and a false
+convergence flag. Always inspect \code{convergence} before interpreting estimates.
+Approximate posterior variances can become invalid in sparse/extreme settings;
+such fits are flagged rather than reported as converged.
+A strictly separating fixed-effect direction found at initialization is
+rejected for binary data, since no finite estimate exists. This sufficient
+check is not a complete detector of all forms of quasi-separation.
 
-At present, the package supports a single random-effect vector (i.e., one variance
-component). However, the theory in the references above—and the joint Poisson-binary
-model already implemented in \pkg{mvglmmRank}—extends naturally to a block-diagonal
-random-effects covariance matrix \eqn{G}. This would allow multiple independent random
-effects and/or random intercept–slope specifications, with intercepts and slopes either
-correlated or uncorrelated (depending on the block structure). Enabling this functionality
-primarily involves allowing the user to specify a \eqn{G} structure in the main fitting
-function. The maintainer has working prototype code for selected \eqn{G} structures, but it
-has not yet been tested sufficiently for release; future support may be added. If you would
-like a particular \eqn{G} structure supported, please email the package maintainer with a
-request.
+\code{vcov_beta} is a joint-Hessian approximation conditional on the fitted
+variance component; it is not a fully exponential observed-information
+estimate and does not incorporate variance-component estimation uncertainty.
+For EM fits, \code{logLik} evaluates the first-order Laplace marginal likelihood
+at the returned estimates, which need not maximize it. For PL fits it is
+unavailable (\code{NA}); \code{working_logLik} stores the working Gaussian objective.
+These objectives should not be used for cross-method AIC comparisons.
+Fitted response values plug the estimated random effects into the inverse
+link; they are not posterior predictive averages over random effects.
 
-Importantly, the current implementation already supports a multiple-membership (or otherwise
-arbitrary) random-effects design matrix \eqn{Z}, which is more general than what is available
-in some other implementations. In particular, the multi-membership setting allows more than
-one random effect from the same variance component to be active on the same observation, possibly
-with different weight entries per random effect; see Karl, Yang, and Lohr (2014) for details.
-
-The \code{RSPL}/\code{MSPL} pseudo-likelihood code paths are adapted from the
-RealVAMS implementation described in Broatch, Green, and Karl (2018), which
-follows Wolfinger and O'Connell (1993) closely (working response + working
-weights).
+See \link{glmmFEL-benchmarks} for a reproducible simulation appraisal and its limits.
 }
-
-\section{Acknowledgments}{
-
-OpenAI's GPT models (such as GPT-5 Pro) were
-used to assist with coding and roxygen documentation; all
-content was reviewed and finalized by the author.
-}
-
 \examples{
 ## Example 1: Simulated probit random-intercept GLMM (matrix interface)
 set.seed(1)

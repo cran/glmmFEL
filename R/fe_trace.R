@@ -33,6 +33,18 @@ fe_trace_diagG <- function(Z, var_eta, temp_trc_C, temp_trc_D, max_nq_mem = 5e7)
   n <- nrow(Z)
   q <- ncol(Z)
 
+  # For disjoint clusters the posterior Hessian is diagonal. These identities
+  # are the same trace formulas below, reduced to scalar sums per cluster.
+  # Retain the general path for crossed/multiple-membership designs.
+  if (all(var_eta[row(var_eta) != col(var_eta)] == 0) &&
+      all(Matrix::rowSums(Z != 0) <= 1)) {
+    v <- diag(var_eta)
+    c3 <- as.numeric(Matrix::crossprod(Z^3, temp_trc_C))
+    c4 <- as.numeric(Matrix::crossprod(Z^4, temp_trc_D))
+    return(list(trc_y1 = v^2 * c3,
+                trc_y2 = Matrix::Diagonal(q, x = v^3 * c4 + 2 * v^4 * c3^2)))
+  }
+
   # Memory guard: forming Svar = Z %*% var_eta is n×q dense.
   use_full_Svar <- (as.double(n) * as.double(q) <= as.double(max_nq_mem))
 

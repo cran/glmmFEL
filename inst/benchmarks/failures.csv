@@ -1,0 +1,51 @@
+family,setting,method,reason,count
+binomial_logit,many_small,FEL_Laplace_EM,iteration_limit,54
+binomial_logit,many_small,FEL_MSPL,iteration_limit,33
+binomial_logit,many_small,FEL_RSPL,iteration_limit,28
+binomial_logit,many_small,FEL_full,iteration_limit,147
+binomial_logit,many_small,FEL_mean,iteration_limit,108
+binomial_logit,many_small,lme4_Laplace,"Model failed to converge with max|grad| = 0.0238369 (tol = 0.002, component 1)",1
+binomial_logit,many_small,lme4_Laplace,"Model failed to converge with max|grad| = 0.0256253 (tol = 0.002, component 1)",1
+binomial_logit,rich,FEL_Laplace_EM,iteration_limit,1
+binomial_logit,rich,FEL_MSPL,iteration_limit,1
+binomial_logit,rich,FEL_full,iteration_limit,2
+binomial_logit,rich,FEL_mean,iteration_limit,1
+binomial_logit,small,FEL_Laplace_EM,iteration_limit,74
+binomial_logit,small,FEL_MSPL,iteration_limit,49
+binomial_logit,small,FEL_RSPL,iteration_limit,40
+binomial_logit,small,FEL_full,iteration_limit,120
+binomial_logit,small,FEL_mean,iteration_limit,92
+binomial_logit,small,lme4_AGQ9,unable to evaluate scaled gradient; Model failed to converge: degenerate  Hessian with 1 negative eigenvalues,1
+binomial_logit,small,lme4_Laplace,unable to evaluate scaled gradient; Model failed to converge: degenerate  Hessian with 1 negative eigenvalues,1
+binomial_logit,unbalanced,FEL_Laplace_EM,iteration_limit,1
+binomial_logit,unbalanced,FEL_MSPL,iteration_limit,1
+binomial_logit,unbalanced,FEL_RSPL,iteration_limit,1
+binomial_logit,unbalanced,FEL_full,iteration_limit,5
+binomial_logit,unbalanced,FEL_mean,iteration_limit,4
+binomial_probit,many_small,FEL_Laplace_EM,iteration_limit,4
+binomial_probit,many_small,FEL_MSPL,iteration_limit,4
+binomial_probit,many_small,FEL_RSPL,iteration_limit,2
+binomial_probit,many_small,FEL_full,iteration_limit,19
+binomial_probit,many_small,FEL_mean,iteration_limit,13
+binomial_probit,many_small,glmmML_GHQ20,not_applicable: glmmML does not implement probit,200
+binomial_probit,many_small,glmmML_Laplace,not_applicable: glmmML does not implement probit,200
+binomial_probit,many_small,lme4_Laplace,"Model failed to converge with max|grad| = 0.0307978 (tol = 0.002, component 1)",1
+binomial_probit,rich,glmmML_GHQ20,not_applicable: glmmML does not implement probit,200
+binomial_probit,rich,glmmML_Laplace,not_applicable: glmmML does not implement probit,200
+binomial_probit,small,FEL_Laplace_EM,iteration_limit,16
+binomial_probit,small,FEL_MSPL,iteration_limit,14
+binomial_probit,small,FEL_RSPL,iteration_limit,4
+binomial_probit,small,FEL_full,invalid_posterior_moments,1
+binomial_probit,small,FEL_full,iteration_limit,45
+binomial_probit,small,FEL_mean,iteration_limit,35
+binomial_probit,small,glmmML_GHQ20,not_applicable: glmmML does not implement probit,200
+binomial_probit,small,glmmML_Laplace,not_applicable: glmmML does not implement probit,200
+binomial_probit,unbalanced,glmmML_GHQ20,not_applicable: glmmML does not implement probit,200
+binomial_probit,unbalanced,glmmML_Laplace,not_applicable: glmmML does not implement probit,200
+poisson_log,many_small,FEL_full,iteration_limit,1
+poisson_log,rich,FEL_Laplace_EM,iteration_limit,13
+poisson_log,rich,FEL_full,iteration_limit,128
+poisson_log,rich,FEL_mean,iteration_limit,112
+poisson_log,unbalanced,FEL_Laplace_EM,iteration_limit,6
+poisson_log,unbalanced,FEL_full,iteration_limit,83
+poisson_log,unbalanced,FEL_mean,iteration_limit,58

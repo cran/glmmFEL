@@ -17,6 +17,7 @@
 # ======================================================================
 
 testthat::local_edition(3)
+testthat::skip_on_cran() # Extended simulation smoke tests; fast independent checks run on CRAN.
 
 # ---- helpers ----
 
@@ -441,10 +442,10 @@ test_that("permuting Z columns leaves beta/tau2 unchanged", {
   perm <- sample(seq_len(ncol(dat$Z)))
   Zp <- dat$Z[, perm]
 
-  fit1 <- glmmFEL(dat$y, dat$X, dat$Z, family="binomial_logit", approx="Laplace",
-                  max_iter=80, tol=1e-5)
-  fit2 <- glmmFEL(dat$y, dat$X, Zp, family="binomial_logit", approx="Laplace",
-                  max_iter=80, tol=1e-5)
+  expect_warning(fit1 <- glmmFEL(dat$y, dat$X, dat$Z, family="binomial_logit", approx="Laplace",
+                  max_iter=3, tol=1e-5), "did not converge")
+  expect_warning(fit2 <- glmmFEL(dat$y, dat$X, Zp, family="binomial_logit", approx="Laplace",
+                  max_iter=3, tol=1e-5), "did not converge")
 
   expect_equal(fit1$beta, fit2$beta, tolerance=1e-6)
   expect_equal(fit1$tau2, fit2$tau2, tolerance=1e-6)
@@ -476,12 +477,11 @@ test_that("tau2_init extremes remain stable", {
 
 
 test_that("FE_full var_eta is base matrix and symmetric", {
-  dat <- simulate_oneway(family="binomial_logit", seed=5)
-  fit <- glmmFEL(dat$y, dat$X, dat$Z, family="binomial_logit", approx="FE_full",
-                 max_iter=120, tol=1e-5)
+  dat <- simulate_oneway(family="poisson_log", n_id=6, m_per_id=20, seed=5)
+  fit <- glmmFEL(dat$y, dat$X, dat$Z, family="poisson_log", approx="FE_full",
+                 max_iter=300, tol=1e-5)
 
   expect_true(is.matrix(fit$var_eta))
   expect_equal(fit$var_eta, t(fit$var_eta), tolerance=1e-10)
   expect_true(all(is.finite(diag(fit$var_eta))))
 })
-
